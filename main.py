@@ -5,15 +5,14 @@ import random
 import threading
 
 # --- Configuration ---
-# Color settings
-TEXT_COLOR = "#FFFFFF"  # Red (Classic Alarm Clock style)
-# TEXT_COLOR = "#00FF00" # Uncomment for Matrix Green
-BG_COLOR = "#000000"    # Black background
-OPACITY = 0.60          # Slightly less transparent for better contrast
-FONT_SIZE = 18         # Bigger for the digital look
-FONT_FAMILY = "DS-Digital" # Make sure this font is installed!
+TEXT_COLOR = "#FFFFFF" 
+DOCK_COLOR = "#000000"  # The color of the rounded bubble
+TRANSPARENT_BG = "#000001" # A color we will make invisible (Don't change this)
+OPACITY = 0.60          # Window transparency
+FONT_SIZE = 18          
+FONT_FAMILY = "DS-Digital" 
 
-# Time in seconds between notifications (8 minutes = 480 seconds)
+# Time in seconds between notifications (8 minutes)
 NOTIFY_INTERVAL = 480 
 
 QUOTES = [
@@ -36,36 +35,59 @@ class FocusOverlay:
         self.root.overrideredirect(True)
         self.root.wm_attributes("-topmost", True)
         self.root.wm_attributes("-alpha", OPACITY)
-        self.root.configure(bg=BG_COLOR)
-
-        # 2. Position (Bottom Right Default)
-        screen_width = self.root.winfo_screenwidth()
-        screen_height = self.root.winfo_screenheight()
         
-        # Adjusted size calculation for the bigger font
-        window_width = 90
-        window_height = 30
-        # x_pos = screen_width - window_width - 20
-        x_loc = (screen_width / 2)
-        print(x_loc)
-        x_pos = 683 
-        # y_pos = screen_height - window_height - 50
-        y_pos = 0 
+        # VITAL: This tells Windows that the color #000001 should be 
+        # completely invisible, cutting off the square corners.
+        self.root.wm_attributes("-transparentcolor", TRANSPARENT_BG)
+        self.root.configure(bg=TRANSPARENT_BG)
+
+        # 2. Position (Top Center Dynamic)
+        screen_width = self.root.winfo_screenwidth()
+        
+        # Dimensions of the dock
+        window_width = 120
+        window_height = 35
+        
+        # Calculate center x
+        x_pos = (screen_width // 2) - (window_width // 2)
+        y_pos = 0 # Top of screen
+        
         self.root.geometry(f"{window_width}x{window_height}+{x_pos}+{y_pos}")
 
-        # 3. UI Elements
-        self.label = tk.Label(
+        # 3. UI Elements (Canvas instead of Label)
+        # We remove the highlightthickness to get rid of the default border
+        self.canvas = tk.Canvas(
             self.root, 
-            font=(FONT_FAMILY, FONT_SIZE), 
-            background=BG_COLOR, 
-            foreground=TEXT_COLOR
+            width=window_width, 
+            height=window_height, 
+            bg=TRANSPARENT_BG, 
+            highlightthickness=0
         )
-        self.label.pack(expand=True)
+        self.canvas.pack(fill="both", expand=True)
+
+        # Draw the Rounded Dock Background
+        # We draw a thick line with rounded caps to simulate a pill shape
+        self.round_rect = self.canvas.create_line(
+            20, (window_height/2),  # Start Point (x, y)
+            window_width - 20, (window_height/2), # End Point
+            fill=DOCK_COLOR, 
+            width=window_height,    # Thickness
+            capstyle=tk.ROUND       # This creates the rounded corners!
+        )
+
+        # Draw the Text on top of the dock
+        self.text_id = self.canvas.create_text(
+            window_width/2, 
+            window_height/2 + 2, # +2 for slight vertical adjustment
+            text="", 
+            font=(FONT_FAMILY, FONT_SIZE), 
+            fill=TEXT_COLOR
+        )
 
         # 4. User Interaction
-        self.root.bind("<Button-1>", self.start_move)
-        self.root.bind("<B1-Motion>", self.do_move)
-        self.root.bind("<Double-Button-1>", self.close_app)
+        self.canvas.bind("<Button-1>", self.start_move)
+        self.canvas.bind("<B1-Motion>", self.do_move)
+        self.canvas.bind("<Double-Button-1>", self.close_app)
         
         # 5. Start Logic
         self.update_clock()
@@ -75,7 +97,8 @@ class FocusOverlay:
 
     def update_clock(self):
         current_time = strftime('%H:%M:%S')
-        self.label.config(text=current_time)
+        # Update canvas text item
+        self.canvas.itemconfigure(self.text_id, text=current_time)
         self.root.after(1000, self.update_clock)
 
     def schedule_notification(self):
